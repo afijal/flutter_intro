@@ -84,9 +84,6 @@ class Intro extends InheritedWidget {
   /// [bool] to enable pulse animation on the highlighted widget (default true)
   final bool highlightPulse;
 
-  /// [bool] to show an arrow pointing at the highlighted widget (default false)
-  final bool showHighlightArrow;
-
   /// [ValueNotifier] of [IntroStatus], which can be used with
   /// [ValueListenableBuilder] for instant UI updates. See readme for example.
   /// Default is not open.
@@ -117,7 +114,6 @@ class Intro extends InheritedWidget {
     this.animationDuration,
     this.highlightBorder,
     this.highlightPulse = true,
-    this.showHighlightArrow = false,
     this.buttonBuilder,
     @Deprecated(
       'Use [buttonBuilder] instead'
@@ -211,7 +207,24 @@ class Intro extends InheritedWidget {
       borderRadius: borderRadiusGeometry,
     );
 
-    Widget widget = AnimatedPositioned(
+    Widget container = AnimatedContainer(
+      padding: padding,
+      decoration: decoration,
+      width: width,
+      height: height,
+      duration: _animationDuration,
+      child: child,
+    );
+
+    // Apply pulse to the container content (not the position) for highlighted widget
+    if (isHighlighted && highlightPulse) {
+      container = _PulseWidget(
+        duration: _animationDuration,
+        child: container,
+      );
+    }
+
+    return AnimatedPositioned(
       duration: _animationDuration,
       left: left,
       top: top,
@@ -219,26 +232,9 @@ class Intro extends InheritedWidget {
       right: right,
       child: GestureDetector(
         onTap: onTap,
-        child: AnimatedContainer(
-          padding: padding,
-          decoration: decoration,
-          width: width,
-          height: height,
-          duration: _animationDuration,
-          child: child,
-        ),
+        child: container,
       ),
     );
-
-    // Add pulse animation for highlighted widget
-    if (isHighlighted && highlightPulse) {
-      widget = _PulseWidget(
-        duration: _animationDuration,
-        child: widget,
-      );
-    }
-
-    return widget;
   }
 
   /// Remove the intro overlay after [_animationDuration] has passed.
@@ -459,11 +455,7 @@ class Intro extends InheritedWidget {
                   duration: _animationDuration,
                   child: _overlayWidget,
                 ),
-                if (showHighlightArrow && _currentStep != null)
-                  _buildArrowWidget(),
-                if ((highlightBorder != null || highlightPulse) &&
-                    _currentStep != null)
-                  _buildHighlightBorder(),
+                if (_currentStep != null) _buildHighlightBorder(),
               ],
             ),
           ),
@@ -475,118 +467,31 @@ class Intro extends InheritedWidget {
 
   /// Build a border widget around the highlighted widget
   Widget _buildHighlightBorder() {
-    // Use provided border or default border if pulse is enabled
-    final border = highlightBorder ??
-        (highlightPulse
-            ? Border.all(
-                color: Colors.white,
-                width: 3.0,
-              )
-            : null);
+    // Only show border if explicitly provided
+    if (highlightBorder == null) return const SizedBox.shrink();
 
-    if (border == null) return const SizedBox.shrink();
+    Widget borderContainer = Container(
+      width: _widgetSize.width,
+      height: _widgetSize.height,
+      decoration: BoxDecoration(
+        border: highlightBorder,
+        borderRadius: _currentStep?.borderRadius ?? borderRadius,
+      ),
+    );
+
+    // Only apply pulse if highlightPulse is enabled
+    if (highlightPulse) {
+      borderContainer = _PulseWidget(
+        duration: _animationDuration,
+        child: borderContainer,
+      );
+    }
 
     return AnimatedPositioned(
       duration: _animationDuration,
       left: _widgetOffset.dx,
       top: _widgetOffset.dy,
-      child: _PulseWidget(
-        duration: _animationDuration,
-        child: Container(
-          width: _widgetSize.width,
-          height: _widgetSize.height,
-          decoration: BoxDecoration(
-            border: border,
-            borderRadius: _currentStep?.borderRadius ?? borderRadius,
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Build an arrow widget that points to the highlighted widget
-  Widget _buildArrowWidget() {
-    if (_currentStep == null) return const SizedBox.shrink();
-
-    // Calculate arrow position based on overlay position
-    OverlayPosition position = _currentStep!.getOverlayPosition != null
-        ? _currentStep!.getOverlayPosition!(
-            screenSize: _screenSize,
-            size: _widgetSize,
-            offset: _widgetOffset,
-          )
-        : _StepWidgetBuilder.getOverlayPosition(
-            screenSize: _screenSize,
-            size: _widgetSize,
-            offset: _widgetOffset,
-          );
-
-    // Determine arrow direction and position
-    double arrowSize = 20.0;
-    double? arrowLeft;
-    double? arrowTop;
-    double? arrowRight;
-    double? arrowBottom;
-    Alignment alignment = Alignment.center;
-
-    // Arrow points from overlay to highlighted widget
-    if (position.top != null) {
-      // Overlay is below the widget, arrow points up
-      arrowTop = position.top! - arrowSize - 4;
-      arrowLeft = position.left ??
-          (position.right != null
-              ? null
-              : _widgetOffset.dx + _widgetSize.width / 2 - arrowSize / 2);
-      arrowRight = position.right != null ? null : null;
-      alignment = Alignment.bottomCenter;
-    } else if (position.bottom != null) {
-      // Overlay is above the widget, arrow points down
-      double overlayBottom = _screenSize.height - (position.bottom ?? 0);
-      arrowTop = overlayBottom + 4;
-      arrowLeft = position.left ??
-          (position.right != null
-              ? null
-              : _widgetOffset.dx + _widgetSize.width / 2 - arrowSize / 2);
-      arrowRight = position.right != null ? null : null;
-      alignment = Alignment.topCenter;
-    } else if (position.left != null &&
-        position.left! > _widgetOffset.dx + _widgetSize.width) {
-      // Overlay is to the right, arrow points left
-      arrowLeft = position.left! - arrowSize - 4;
-      arrowTop = position.top ??
-          _widgetOffset.dy + _widgetSize.height / 2 - arrowSize / 2;
-      alignment = Alignment.centerRight;
-    } else if (position.right != null) {
-      // Overlay is to the left, arrow points right
-      double overlayRight = _screenSize.width - (position.right ?? 0);
-      arrowLeft = overlayRight + 4;
-      arrowTop = position.top ??
-          _widgetOffset.dy + _widgetSize.height / 2 - arrowSize / 2;
-      alignment = Alignment.centerLeft;
-    } else {
-      // Default: arrow below overlay pointing up
-      arrowTop = position.top != null
-          ? position.top! - arrowSize - 4
-          : _widgetOffset.dy + _widgetSize.height + 4;
-      arrowLeft = _widgetOffset.dx + _widgetSize.width / 2 - arrowSize / 2;
-      alignment = Alignment.bottomCenter;
-    }
-
-    return Positioned(
-      left: arrowLeft,
-      top: arrowTop,
-      right: arrowRight,
-      bottom: arrowBottom,
-      child: _PulseWidget(
-        duration: _animationDuration,
-        child: CustomPaint(
-          size: Size(arrowSize, arrowSize),
-          painter: _ArrowPainter(
-            color: Colors.white,
-            alignment: alignment,
-          ),
-        ),
-      ),
+      child: borderContainer,
     );
   }
 
@@ -636,61 +541,5 @@ class Intro extends InheritedWidget {
   @override
   bool updateShouldNotify(Intro oldWidget) {
     return false;
-  }
-}
-
-/// Custom painter for drawing arrows pointing to highlighted widgets
-class _ArrowPainter extends CustomPainter {
-  final Color color;
-  final Alignment alignment;
-
-  _ArrowPainter({
-    required this.color,
-    required this.alignment,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-
-    final path = Path();
-    final center = Offset(size.width / 2, size.height / 2);
-    final arrowSize = size.width * 0.4;
-
-    // Draw arrow based on alignment
-    if (alignment == Alignment.bottomCenter) {
-      // Arrow pointing up
-      path.moveTo(center.dx, 0);
-      path.lineTo(center.dx - arrowSize, arrowSize);
-      path.lineTo(center.dx + arrowSize, arrowSize);
-      path.close();
-    } else if (alignment == Alignment.topCenter) {
-      // Arrow pointing down
-      path.moveTo(center.dx, size.height);
-      path.lineTo(center.dx - arrowSize, size.height - arrowSize);
-      path.lineTo(center.dx + arrowSize, size.height - arrowSize);
-      path.close();
-    } else if (alignment == Alignment.centerRight) {
-      // Arrow pointing left
-      path.moveTo(0, center.dy);
-      path.lineTo(arrowSize, center.dy - arrowSize);
-      path.lineTo(arrowSize, center.dy + arrowSize);
-      path.close();
-    } else if (alignment == Alignment.centerLeft) {
-      // Arrow pointing right
-      path.moveTo(size.width, center.dy);
-      path.lineTo(size.width - arrowSize, center.dy - arrowSize);
-      path.lineTo(size.width - arrowSize, center.dy + arrowSize);
-      path.close();
-    }
-
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(_ArrowPainter oldDelegate) {
-    return oldDelegate.color != color || oldDelegate.alignment != alignment;
   }
 }

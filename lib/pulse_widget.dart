@@ -23,13 +23,13 @@ class _PulseWidgetState extends State<_PulseWidget>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(milliseconds: 1200),
       vsync: this,
     )..repeat(reverse: true);
 
     _scaleAnimation = Tween<double>(
       begin: 1.0,
-      end: 1.05,
+      end: 1.1,
     ).animate(CurvedAnimation(
       parent: _controller,
       curve: Curves.easeInOut,
