@@ -71,12 +71,17 @@ class _DelayRenderedWidgetState extends State<_DelayRenderedWidget> {
         setState(() {
           opacity = 0;
         });
-        Timer(
+        // Store and cancel-on-replace so dispose() tears this down, and guard
+        // the callback with `mounted`: the widget can be disposed during the
+        // delay, and setState() on a disposed State throws.
+        timer.cancel();
+        timer = Timer(
           Duration(
             milliseconds:
                 duration.inMilliseconds + durationInterval.inMilliseconds,
           ),
           () {
+            if (!mounted) return;
             setState(() {
               child = widget.child;
               opacity = 1;
