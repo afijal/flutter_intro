@@ -540,6 +540,24 @@ class Intro extends InheritedWidget {
 
   @override
   bool updateShouldNotify(Intro oldWidget) {
+    // Step registrations and finished groups live on the widget instance,
+    // but IntroStepBuilders register only once (post-frame on mount). When
+    // an ancestor rebuild recreates the Intro widget, the fresh instance
+    // would start with an empty _stepsMap and a later start() would silently
+    // finish on the empty group. Carry the session over instead.
+    if (!identical(this, oldWidget)) {
+      oldWidget._stepsMap.forEach((group, steps) {
+        final mine = _stepsMap.putIfAbsent(group, () => []);
+        mine.addAll(
+          steps.where((s) => !mine.any((e) => e.order == s.order)),
+        );
+      });
+      for (final group in oldWidget._finishedGroups) {
+        if (!_finishedGroups.contains(group)) {
+          _finishedGroups.add(group);
+        }
+      }
+    }
     return false;
   }
 }
