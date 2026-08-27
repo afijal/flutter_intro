@@ -89,6 +89,9 @@ class _IntroStepBuilderState extends State<IntroStepBuilder> {
     super.initState();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // The widget can be disposed before the frame ends (list item scrolled
+      // away, route popped) - reading `context` then throws.
+      if (!mounted) return;
       Intro flutterIntro = Intro.of(context);
       flutterIntro._stepsMap[widget.group] ??= [];
       flutterIntro._stepsMap[widget.group]!
@@ -104,6 +107,7 @@ class _IntroStepBuilderState extends State<IntroStepBuilder> {
 
     if (oldWidget.group != widget.group || oldWidget.order != widget.order) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
         Intro flutterIntro = Intro.of(context);
         flutterIntro._stepsMap[widget.group] ??= [];
         flutterIntro._stepsMap[oldWidget.group]
